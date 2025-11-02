@@ -7,7 +7,7 @@ The project accompanies the full write-up available on Overleaf:
 
 ---
 
-## 🧭 Overview
+## Overview
 The pipeline evaluates how differentially private heavy-hitter reduction enables MWEM + PGM to scale to high-cardinality categorical attributes such as ZIP codes.  
 This baseline establishes a control case before extending to **Hierarchical** and **Similarity-based** bucketization methods and **weighted** sampling.
 
@@ -21,7 +21,7 @@ This baseline establishes a control case before extending to **Hierarchical** an
 
 ---
 
-## ⚙️ Quick Start
+## Quick Start
 
 ```bash
 python -m venv .venv
