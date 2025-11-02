@@ -1,6 +1,6 @@
 # MWEM + PGM Experiment (Baseline)
 
-This repository contains the code and results for **“MWEM + PGM Experiment”**, developed by Lauren LaPorta (University of Virginia, 2025).  
+This repository contains the code and results for **“MWEM + PGM Experiment”**.
 It implements a **differentially private synthetic data generation pipeline** using the MWEM + PGM framework with a *Flat (naïve) + Uniform sampling* baseline.  
 The project accompanies the full write-up available on Overleaf:  
 👉 [Read the paper here](https://www.overleaf.com/read/XXXXXXXXXXXX) ← *replace with your share link.*
