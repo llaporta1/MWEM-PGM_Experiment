@@ -1,33 +1,75 @@
-#!/usr/bin/env python3
-# evaluate_sdnist.py
 import argparse, json
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List, Sequence, Tuple, Optional, Callable
 import numpy as np, pandas as pd
 
 SDNIST_AVAILABLE = False; SDNIST_VERSION = None
+_SD_L2_FN: Optional[Callable[[np.ndarray, np.ndarray], float]] = None
 try:
-    import sdnist  # type: ignore
+    import sdnist
     SDNIST_AVAILABLE = True
-    try: SDNIST_VERSION = getattr(sdnist, "__version__", "unknown")
-    except Exception: SDNIST_VERSION = "unknown"
+    try:
+        SDNIST_VERSION = getattr(sdnist, "__version__", "unknown")
+    except Exception:
+        SDNIST_VERSION = "unknown"
+    # Try to locate an L2/Euclidean distance helper inside SDNist (since API surface can vary by version)
+    try:
+        # common places/names to probe; we normalize vectors before passing
+        candidates = []
+        if hasattr(sdnist, "metrics"):
+            m = sdnist.metrics
+            for name in ["l2", "l2_distance", "euclidean", "L2", "euclidean_distance"]:
+                if hasattr(m, name) and callable(getattr(m, name)):
+                    candidates.append(getattr(m, name))
+            for sub in ["distance", "distances", "metrics"]:
+                if hasattr(m, sub):
+                    submod = getattr(m, sub)
+                    for name in ["l2", "l2_distance", "euclidean", "euclidean_distance"]:
+                        if hasattr(submod, name) and callable(getattr(submod, name)):
+                            candidates.append(getattr(submod, name))
+        _SD_L2_FN = candidates[0] if candidates else None
+    except Exception:
+        _SD_L2_FN = None
 except Exception:
     SDNIST_AVAILABLE = False
 
-def l1_error(df1: pd.DataFrame, df2: pd.DataFrame, cols: Sequence[str]) -> float:
-    cols = list(cols) 
+def _histogram_pair(df1: pd.DataFrame, df2: pd.DataFrame, cols: Sequence[str]) -> Tuple[np.ndarray, np.ndarray]:
+    cols = list(cols)
     r = df1[cols].astype(str).groupby(cols).size()
     s = df2[cols].astype(str).groupby(cols).size()
     idx = r.index.union(s.index)
     r = r.reindex(idx, fill_value=0).astype(float)
     s = s.reindex(idx, fill_value=0).astype(float)
-    if r.sum() == 0 or s.sum() == 0:
+    r_sum, s_sum = r.sum(), s.sum()
+    if r_sum == 0 or s_sum == 0:
+        return np.array([]), np.array([])
+    r = r / r_sum
+    s = s / s_sum
+    return r.values, s.values
+
+def l1_error(df1: pd.DataFrame, df2: pd.DataFrame, cols: Sequence[str]) -> float:
+    r, s = _histogram_pair(df1, df2, cols)
+    if r.size == 0 or s.size == 0:
         return float("nan")
-    r /= r.sum(); s /= s.sum()
     return float(np.abs(r - s).sum())
 
+def l2_error(df1: pd.DataFrame, df2: pd.DataFrame, cols: Sequence[str]) -> float:
+    """Compute L2 (Euclidean) distance between normalized histograms for the given marginal.
+    If SDNist provides an L2 function, use it; otherwise fall back to numpy."""
+    r, s = _histogram_pair(df1, df2, cols)
+    if r.size == 0 or s.size == 0:
+        return float("nan")
+    # Prefer SDNist if available and callable
+    if SDNIST_AVAILABLE and callable(_SD_L2_FN):
+        try:
+            return float(_SD_L2_FN(r, s))
+        except Exception:
+            pass
+    # Fallback: Euclidean distance
+    return float(np.sqrt(((r - s) ** 2).sum()))
+
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Evaluate synthetic data with L1 over specified marginals (SDNist optional).")
+    p = argparse.ArgumentParser(description="Evaluate synthetic data with L1/L2 over specified marginals (SDNist optional).")
     # repo-relative defaults (no ../)
     p.add_argument("--real", default="data/dataset_reduced.csv")
     p.add_argument("--syn",  default="results/synthetic.csv")
@@ -89,15 +131,21 @@ def main() -> None:
 
     rows = []
     for cols in marginals:
-        rows.append({"marginal": "+".join(cols), "L1_error": l1_error(real, syn, cols)})
+        l1 = l1_error(real, syn, cols)
+        l2 = l2_error(real, syn, cols)
+        rows.append({"marginal": "+".join(cols), "L1_error": l1, "L2_error": l2})
 
     df_out = pd.DataFrame(rows)
     mean_l1 = float(df_out["L1_error"].mean())
+    mean_l2 = float(df_out["L2_error"].mean())
+
     summary = {
         "sdnist_available": SDNIST_AVAILABLE,
         "sdnist_version": SDNIST_VERSION,
         "n_marginals": len(marginals),
         "mean_L1_error": mean_l1,
+        "mean_L2_error": mean_l2,
+        "used_sdnist_l2": bool(SDNIST_AVAILABLE and callable(_SD_L2_FN)),
     }
 
     Path(args.out_csv).parent.mkdir(parents=True, exist_ok=True)
@@ -108,9 +156,11 @@ def main() -> None:
 
     sdnist_line = "yes" if SDNIST_AVAILABLE else "no"
     if SDNIST_AVAILABLE and SDNIST_VERSION: sdnist_line += f" (version={SDNIST_VERSION})"
-    print("SDNist:", sdnist_line)
-    for r in rows: print(f"{r['marginal']}: L1 = {r['L1_error']:.4f}")
+    print("SDNist:", sdnist_line, "| L2 via SDNist fn:", "yes" if summary["used_sdnist_l2"] else "no")
+    for r in rows:
+        print(f"{r['marginal']}: L1 = {r['L1_error']:.4f} | L2 = {r['L2_error']:.4f}")
     print(f"Mean L1 Error = {mean_l1:.4f}")
+    print(f"Mean L2 Error = {mean_l2:.4f}")
     print(f"Wrote {args.out_csv}"); print(f"Wrote {args.out_json}")
 
 if __name__ == "__main__":

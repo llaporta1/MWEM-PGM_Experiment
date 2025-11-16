@@ -1,6 +1,7 @@
+# office hours - tu/th 3-4:30 and share progress
+# ipums derived dataset comes with sdnist
+# uniform might be best for sparse values 
 
-#!/usr/bin/env python3
-# make_dataset.py (ZIP-based version)
 import argparse
 import random
 from datetime import date

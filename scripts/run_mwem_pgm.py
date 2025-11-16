@@ -1,4 +1,3 @@
-# allow importing the local "private_pgm" package from the project root
 import os, sys
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # one level up from scripts/
 if _PROJECT_ROOT not in sys.path:
@@ -24,7 +23,7 @@ df = df.dropna()
 
 cols = ["ZIP_reduced", "Age_bin", "Income_bin", "Category"]
 df = df[cols]
-# (Removes raw continuous variables since the binned versions replace them.)
+# (Removes raw continuous variables since the binned versions replace them)
 
 # domain: all unique values for each column
 domain = {c: sorted(df[c].astype(str).unique().tolist()) for c in df.columns}
@@ -43,7 +42,7 @@ workload = Marginals(domain, query_sets)
 # remaining budget
 epsilon = 0.95  # 95 % after HH step
 rounds = len(df.columns)
-# rounds controls how many MWEM iterations to run (one per attribute is a common rule of thumb).
+# rounds controls how many MWEM iterations to run (one per attribute)
 
 mwem = MWEM(domain=domain, epsilon=epsilon, rounds=rounds)
 

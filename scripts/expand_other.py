@@ -1,6 +1,4 @@
 
-#!/usr/bin/env python3
-# expand_other.py (ZIP version)
 import argparse
 import numpy as np
 import pandas as pd
@@ -11,7 +9,7 @@ def parse_args():
     p.add_argument("--real", default="../data/dataset_reduced.csv", help="Real (post-HH) dataset; has ZIP & ZIP_reduced.")
     p.add_argument("--syn",  default="../results/synthetic.csv", help="Synthetic dataset to expand (has ZIP_reduced).")
     p.add_argument("--out",  default="../results/synthetic_expanded.csv", help="Output CSV with ZIP_imputed/ZIP_final.")
-    p.add_argument("--strategy", choices=["uniform"], default="uniform") # only randomly select ZIPs
+    p.add_argument("--strategy", choices=["uniform"], default="uniform") # only randomly select ZIPs for now
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
@@ -33,7 +31,7 @@ def main():
     # if there are no OTHER rows
     else:
         rng = np.random.default_rng(args.seed)
-        # random number generator 
+        # rng
         is_other = syn["ZIP_reduced"] == "OTHER"
         # boolean mask over synthetic OTHER rows
         n_other = int(is_other.sum())
@@ -45,7 +43,7 @@ def main():
         zip_imputed[is_other.to_numpy()] = choices
         # plug sampled ZIPs into positions where synthetic rows are OTHER
         syn["ZIP_imputed"] = zip_imputed
-        # save as new column
+        # save as new col
         syn["ZIP_final"] = syn["ZIP_reduced"].where(~is_other, syn["ZIP_imputed"])
     # builds final zip: for non other rows, keep orginal reduced value and for OTHER rows, use the imputed concrete ZIP
     syn["ZIP_final"] = syn["ZIP_final"].astype(str)
